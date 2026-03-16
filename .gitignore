@@ -1,5 +1,6 @@
 .venv
-.envs/
+.envs/venvs/*
+!.envs/venvs/make-venv
 state/
 configs
 slurm
