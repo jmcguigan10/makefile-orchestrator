@@ -1,0 +1,175 @@
+configs:
+  input_dim:
+    value: 128
+    type: int
+    min: 1
+    description: Number of input features consumed by the first layer.
+    aliases:
+    - features
+  output_dim:
+    value: 10
+    type: int
+    min: 1
+    description: Number of output units or classes.
+    aliases:
+    - classes
+  hidden_sizes:
+    value:
+    - 512
+    - 256
+    - 128
+    type: int_list
+    min: 1
+    description: Width of each hidden layer in order.
+    aliases:
+    - layers
+  activation:
+    value: gelu
+    type: choice
+    choices:
+    - relu
+    - gelu
+    - tanh
+    - silu
+    - elu
+    description: Nonlinearity used between linear layers.
+  dropout:
+    value: 0.15
+    type: float
+    min: 0.0
+    max: 0.9
+    description: Dropout probability applied to hidden activations.
+  bn:
+    value: true
+    type: bool
+    description: Enable batch normalization after hidden layers.
+    aliases:
+    - batch_norm
+    - batchnorm
+  layer_norm:
+    value: false
+    type: bool
+    description: Enable layer normalization in hidden blocks.
+    aliases:
+    - ln
+  optimizer:
+    value: adamw
+    type: choice
+    choices:
+    - sgd
+    - adam
+    - adamw
+    - rmsprop
+    description: Optimizer used during training.
+    aliases:
+    - opt
+  lr:
+    value: 0.001
+    type: float
+    min: 1.0e-06
+    max: 1.0
+    description: Learning rate used by the optimizer.
+    aliases:
+    - learning_rate
+  weight_decay:
+    value: 0.0001
+    type: float
+    min: 0.0
+    max: 1.0
+    description: L2-style regularization coefficient.
+    aliases:
+    - wd
+  batch_size:
+    value: 128
+    type: int
+    min: 1
+    description: Number of samples per optimization step.
+    aliases:
+    - bs
+  epochs:
+    value: 50
+    type: int
+    min: 1
+    description: Number of training epochs.
+  scheduler:
+    value: cosine
+    type: choice
+    choices:
+    - none
+    - cosine
+    - step
+    - onecycle
+    description: Learning-rate schedule strategy.
+  scheduler_step:
+    value: 10
+    type: int
+    min: 1
+    description: Step size for step-based schedulers.
+  scheduler_gamma:
+    value: 0.5
+    type: float
+    min: 0.0
+    max: 1.0
+    description: Multiplicative decay factor for supported schedulers.
+  grad_clip:
+    value: 1.0
+    type: float
+    min: 0.0
+    description: Maximum gradient norm before clipping.
+    aliases:
+    - grad_clip_norm
+  init:
+    value: kaiming_uniform
+    type: choice
+    choices:
+    - xavier_uniform
+    - xavier_normal
+    - kaiming_uniform
+    - kaiming_normal
+    description: Parameter initialization scheme.
+  loss:
+    value: cross_entropy
+    type: choice
+    choices:
+    - cross_entropy
+    - mse
+    - bce_with_logits
+    description: Loss function used for optimization.
+  label_smoothing:
+    value: 0.0
+    type: float
+    min: 0.0
+    max: 1.0
+    description: Smoothing value for classification targets.
+  seed:
+    value: 42
+    type: int
+    min: 0
+    description: Random seed for reproducibility.
+  device:
+    value: cpu
+    type: choice
+    choices:
+    - cpu
+    - cuda
+    - mps
+    description: Device target for training and inference.
+  mixed_precision:
+    value: false
+    type: bool
+    description: Enable automatic mixed precision when supported.
+    aliases:
+    - amp
+  early_stopping_patience:
+    value: 8
+    type: int
+    min: 0
+    description: Epochs to wait for improvement before stopping.
+    aliases:
+    - patience
+  save_best_only:
+    value: true
+    type: bool
+    description: Persist only the best checkpoint during training.
+    aliases:
+    - best_only
