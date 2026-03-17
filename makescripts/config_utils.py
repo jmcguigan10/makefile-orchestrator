@@ -336,6 +336,68 @@ def print_current_env_mode() -> None:
     print(f"active slurm: {summary['active_slurm'] or 'hidden'}")
 
 
+def print_user_overview() -> None:
+    profiles = list_users()
+    current_user = get_current_user(required=False)
+    current_user_id = None if current_user is None else str(current_user["user_id"])
+
+    if not profiles:
+        print("Users:")
+        print("  (none)")
+        return
+
+    print("Users:")
+    for profile in profiles:
+        user_id = str(profile["user_id"])
+        env_state = load_env_state(user_id)
+        marker = "*" if user_id == current_user_id else " "
+        mode_label = str(env_state.get("mode") or "unset")
+        venv_label = str(env_state.get("venv_name") or "none")
+        print(f"  {marker} {profile['username']:<18} mode={mode_label:<15} venv={venv_label}")
+
+
+def print_status_summary() -> None:
+    profiles = list_users()
+    current_user = get_current_user(required=False)
+    print("Status:")
+    print(f"  users: {len(profiles)}")
+    if current_user is None:
+        print("  current user: none")
+        print("  env-mode: not set")
+        print("  active configs: hidden")
+        print("  active slurm: hidden")
+        return
+
+    user_id = str(current_user["user_id"])
+    env_state = load_env_state(user_id)
+    summary = describe_env_workspace(user_id, str(current_user["username"]), env_state)
+    print(f"  current user: {summary['user']}")
+    print(f"  env-mode: {summary['mode'] or 'not set'}")
+    venv_info = summary["venv"]
+    if venv_info["name"] is None:
+        print("  venv: not set")
+    else:
+        venv_line = str(venv_info["name"])
+        if venv_info["relative_path"]:
+            venv_line += f" ({venv_info['relative_path']})"
+        if not venv_info["exists"]:
+            venv_line += " [missing]"
+        print(f"  venv: {venv_line}")
+    print(f"  active configs: {summary['active_configs'] or 'hidden'}")
+    print(f"  active slurm: {summary['active_slurm'] or 'hidden'}")
+    store = load_store(user_id)
+    configs = get_configs(store)
+    print(f"  config count: {len(configs)}")
+    for key in ("lr", "batch_size", "seed", "device", "bn"):
+        if key in configs:
+            print(f"  {key}: {format_value(configs[key]['value'])}")
+
+
+def initial_history_timestamp(user_id: str) -> str:
+    profile = load_profile(user_id)
+    return str(profile.get("created_at") or current_timestamp())
+
+
 def apply_env_state_without_action(user_id: str, mode: str | None, venv_name: str | None) -> dict[str, Any]:
     env_state = load_env_state(user_id)
     env_state["mode"] = normalize_env_mode(mode)
@@ -1163,9 +1225,15 @@ def print_global_history_window(name: str, store: dict[str, Any], back: int, lis
         )
 
 
-def make_history_entry(event: str, value: Any, previous_value: Any | None = None) -> dict[str, Any]:
+def make_history_entry(
+    event: str,
+    value: Any,
+    previous_value: Any | None = None,
+    *,
+    recorded_at: str | None = None,
+) -> dict[str, Any]:
     entry = {
-        "recorded_at": current_timestamp(),
+        "recorded_at": recorded_at or current_timestamp(),
         "event": event,
         "value": deepcopy(value),
     }
@@ -1212,7 +1280,7 @@ def sync_history_log(name: str, current_value: Any, user_id: str | None = None) 
     log = load_history_log(name, user_id)
     entries = log["entries"]
     if not entries:
-        entries.append(make_history_entry("initial", current_value))
+        entries.append(make_history_entry("initial", current_value, recorded_at=initial_history_timestamp(user_id)))
         save_history_log(name, log, user_id)
         return log
 

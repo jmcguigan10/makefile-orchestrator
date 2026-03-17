@@ -19,6 +19,7 @@ from venv_utils import (
     prompt_custom_library,
     prompt_for_venv,
     prompt_select,
+    split_package_spec,
 )
 
 
@@ -42,6 +43,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--value",
         "-val",
         help="Optional new value when editing a config.",
+    )
+    parser.add_argument(
+        "--install",
+        action="append",
+        default=[],
+        help="Package spec to install into a venv. Repeat as needed.",
+    )
+    parser.add_argument(
+        "--remove",
+        dest="remove_packages",
+        action="append",
+        default=[],
+        help="Package name to uninstall from a venv. Repeat as needed.",
+    )
+    parser.add_argument(
+        "--confirm-managed",
+        action="store_true",
+        help="Allow non-interactive edits to make-venv.",
     )
     return parser
 
@@ -239,6 +258,57 @@ def edit_venv_libraries(venv_name: str) -> None:
     print(f"Updated {venv.name} at {plain_relative(venv.path)}.")
 
 
+def normalize_install_specs(raw_specs: list[str]) -> list[str]:
+    cleaned_specs: list[str] = []
+    seen: set[str] = set()
+    for raw_spec in raw_specs:
+        cleaned = raw_spec.strip()
+        if not cleaned:
+            continue
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        cleaned_specs.append(cleaned)
+    return cleaned_specs
+
+
+def normalize_remove_specs(raw_specs: list[str]) -> list[str]:
+    cleaned_packages: list[str] = []
+    seen: set[str] = set()
+    for raw_spec in raw_specs:
+        name, _ = split_package_spec(raw_spec)
+        cleaned = name.strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned_packages.append(cleaned)
+    return cleaned_packages
+
+
+def edit_venv_libraries_scripted(
+    venv_name: str,
+    *,
+    install_specs: list[str],
+    remove_packages: list[str],
+    confirm_managed: bool,
+) -> None:
+    venv = get_venv_by_name(venv_name)
+    if venv.managed and not confirm_managed:
+        raise ValueError("Editing make-venv non-interactively requires --confirm-managed.")
+
+    cleaned_install_specs = normalize_install_specs(install_specs)
+    cleaned_remove_packages = normalize_remove_specs(remove_packages)
+    if not cleaned_install_specs and not cleaned_remove_packages:
+        print(f"No changes queued for {venv.name}.")
+        return
+
+    apply_package_changes(venv.path, remove_packages=cleaned_remove_packages, install_specs=cleaned_install_specs)
+    print(f"Updated {venv.name} at {plain_relative(venv.path)}.")
+
+
 def edit_config_value(requested: str, raw_value: str | None) -> None:
     from config_utils import (
         apply_config_change,
@@ -276,15 +346,27 @@ def main() -> int:
         normalized_target = target.lower()
 
         if normalized_target == "venvs":
+            scripted_venv_edit = bool(args.install or args.remove_packages)
             if args.name is not None:
                 selected_venv = get_venv_by_name(args.name)
             else:
                 selected_venv = prompt_for_venv()
-            edit_venv_libraries(selected_venv.name)
+            if scripted_venv_edit:
+                edit_venv_libraries_scripted(
+                    selected_venv.name,
+                    install_specs=list(args.install),
+                    remove_packages=list(args.remove_packages),
+                    confirm_managed=bool(args.confirm_managed),
+                )
+            else:
+                edit_venv_libraries(selected_venv.name)
             return 0
 
         if normalized_target in {"user", "username"}:
             raise ValueError("Use 'make change user' or 'make change username' for user management.")
+
+        if args.install or args.remove_packages or args.confirm_managed:
+            raise ValueError("Venv package flags only apply to 'make edit venvs'.")
 
         edit_config_value(target, args.value)
         return 0

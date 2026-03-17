@@ -22,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         "-cfg",
-        help="Change target. Supported values: user, username.",
+        help="Change target. Supported values: user, username, env-mode.",
     )
     parser.add_argument(
         "--value",

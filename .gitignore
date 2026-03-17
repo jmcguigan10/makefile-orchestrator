@@ -5,3 +5,4 @@ state/
 configs
 slurm
 __pycache__/
+edit-suggestions.md

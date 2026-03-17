@@ -220,7 +220,7 @@ def slurm_script_text(env_state: dict[str, Any]) -> str:
         "fi",
         "",
         'if [ -z "${VENV:-}" ]; then',
-        "    echo \"Error: VENV is not set. Run via 'make slurm'.\" >&2",
+        "    echo \"Error: VENV is not set. Select an env-mode with a venv or export VENV explicitly.\" >&2",
         "    exit 1",
         "fi",
         "",

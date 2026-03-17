@@ -20,6 +20,8 @@ from venv_utils import (
     prompt_python_selection,
     prompt_requirements_choice,
     prompt_select,
+    resolve_python_interpreter,
+    resolve_requirements_file,
     resolve_env_dir,
     split_package_spec,
 )
@@ -35,6 +37,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--name",
         help="Optional name. For pyvenv this is used as the environment directory or venv name.",
+    )
+    parser.add_argument(
+        "--python",
+        dest="python_selection",
+        help="Optional Python version, command, or interpreter path for non-interactive pyvenv creation.",
+    )
+    parser.add_argument(
+        "--deps-mode",
+        choices=["requirements", "libraries", "none"],
+        help="Dependency selection mode for non-interactive pyvenv creation.",
+    )
+    parser.add_argument(
+        "--requirements",
+        help="Requirements file to install when using --deps-mode requirements.",
+    )
+    parser.add_argument(
+        "--package",
+        action="append",
+        default=[],
+        help="Package spec to install when using --deps-mode libraries. Repeat as needed.",
     )
     return parser
 
@@ -138,6 +160,55 @@ def prompt_dependency_plan() -> tuple[str, str | None, list[str]]:
     return dependency_mode, None, []
 
 
+def resolve_python_plan(raw_selection: str | None) -> tuple[str, str]:
+    if raw_selection is None:
+        return prompt_python_selection()
+    return resolve_python_interpreter(raw_selection)
+
+
+def dependency_plan_from_args(
+    deps_mode: str | None,
+    requirements_path: str | None,
+    packages: list[str],
+) -> tuple[str, str | None, list[str]]:
+    cleaned_packages = [package.strip() for package in packages if package.strip()]
+    interactive_shell = sys.stdin.isatty() and sys.stdout.isatty()
+    inferred_mode = deps_mode
+    if inferred_mode is None:
+        if requirements_path is not None:
+            inferred_mode = "requirements"
+        elif cleaned_packages:
+            inferred_mode = "libraries"
+
+    if inferred_mode is None:
+        return prompt_dependency_plan()
+
+    if inferred_mode == "none":
+        if requirements_path is not None or cleaned_packages:
+            raise ValueError("--deps-mode none cannot be combined with --requirements or --package.")
+        return inferred_mode, None, []
+
+    if inferred_mode == "requirements":
+        if cleaned_packages:
+            raise ValueError("--package cannot be combined with --deps-mode requirements.")
+        if requirements_path is not None:
+            return inferred_mode, str(resolve_requirements_file(requirements_path)), []
+        if not interactive_shell:
+            raise ValueError("--requirements is required for non-interactive requirements mode.")
+        return inferred_mode, str(prompt_requirements_choice()), []
+
+    if inferred_mode == "libraries":
+        if requirements_path is not None:
+            raise ValueError("--requirements cannot be combined with --deps-mode libraries.")
+        if cleaned_packages:
+            return inferred_mode, None, cleaned_packages
+        if not interactive_shell:
+            raise ValueError("At least one --package is required for non-interactive libraries mode.")
+        return inferred_mode, None, prompt_libraries()
+
+    raise ValueError(f"Unsupported dependency mode '{inferred_mode}'.")
+
+
 def create_user_flow(name: str | None) -> None:
     from config_utils import create_user, prompt_username
 
@@ -146,17 +217,28 @@ def create_user_flow(name: str | None) -> None:
     print(f"User successfully created! Welcome to the Pipeline {profile['username']}!")
 
 
-def create_pyvenv_flow(default_dir: str | None) -> None:
+def create_pyvenv_flow(
+    default_dir: str | None,
+    *,
+    python_selection: str | None,
+    deps_mode: str | None,
+    requirements_path: str | None,
+    packages: list[str],
+) -> None:
     env_dir = prompt_environment_directory(default_dir) if default_dir is None else resolve_env_dir(default_dir)
-    python_command, python_version = prompt_python_selection()
-    dependency_mode, requirements_path_str, packages = prompt_dependency_plan()
+    python_command, python_version = resolve_python_plan(python_selection)
+    dependency_mode, requirements_path_str, resolved_packages = dependency_plan_from_args(
+        deps_mode,
+        requirements_path,
+        packages,
+    )
     plan = PyVenvPlan(
         env_dir=env_dir,
         python_command=python_command,
         python_version=python_version,
         dependency_mode=dependency_mode,
         requirements_file=None if requirements_path_str is None else Path(requirements_path_str),
-        packages=packages,
+        packages=resolved_packages,
         managed_env=env_dir.resolve() == MANAGED_VENV_DIR.resolve(),
     )
     create_virtualenv(plan)
@@ -172,7 +254,13 @@ def main() -> int:
             return 0
 
         if args.object == "pyvenv":
-            create_pyvenv_flow(args.name)
+            create_pyvenv_flow(
+                args.name,
+                python_selection=args.python_selection,
+                deps_mode=args.deps_mode,
+                requirements_path=args.requirements,
+                packages=list(args.package),
+            )
             return 0
 
         raise ValueError("Supported create targets are 'user' and 'pyvenv'.")

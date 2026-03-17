@@ -75,6 +75,9 @@ Examples:
 ```bash
 make new pyvenv
 make new pyvenv NAME=experiment-a
+make new pyvenv NAME=experiment-a ARGS="--python 3.11 --deps-mode none"
+make new pyvenv NAME=experiment-a ARGS="--python 3.11 --deps-mode requirements --requirements requirements.txt"
+make new pyvenv NAME=experiment-a ARGS="--python 3.11 --deps-mode libraries --package torch==2.5.1 --package pandas"
 ```
 
 ### `make show`
@@ -137,6 +140,14 @@ Shows the current active user.
 make show user
 ```
 
+#### `make show users`
+
+Shows every known user, marks the active one, and includes each user's current mode and selected venv.
+
+```bash
+make show users
+```
+
 #### `make show env-mode`
 
 Shows the current execution mode for the active user, the selected venv, and where the active and hidden generated files live.
@@ -155,6 +166,14 @@ Lists all known virtual environments and their installed libraries.
 make show venvs
 ```
 
+#### `make status`
+
+Shows an operator-friendly summary of the current user, mode, selected venv, active workspace links, and a few key config values.
+
+```bash
+make status
+```
+
 ### `make change`
 
 Change user-level state.
@@ -170,6 +189,12 @@ Examples:
 ```bash
 make change user
 make change user VALUE=alice
+```
+
+`NAME=alice` also works as a compatibility alias:
+
+```bash
+make change user NAME=alice
 ```
 
 #### `make change username`
@@ -249,6 +274,7 @@ Examples:
 ```bash
 make edit venvs
 make edit venvs NAME=experiment-a
+make edit venvs NAME=experiment-a ARGS="--install torch==2.5.1 --install pandas --remove seaborn"
 ```
 
 Behavior:
@@ -316,6 +342,20 @@ This is mostly a maintenance command.
 make remove venv
 ```
 
+### `make doctor`
+
+Runs a consistency check across:
+
+- session state
+- user profiles and config stores
+- selected venv references
+- generated hidden mode assets
+- active `configs/` and `slurm/` workspace links
+
+```bash
+make doctor
+```
+
 ### Internal target: `make venv`
 
 `make venv` bootstraps the managed tooling environment used by the Makefile scripts.
@@ -350,7 +390,7 @@ The same rule applies to other commands that forward CLI flags to Python scripts
 
 ```bash
 make new user NAME=alice
-make new pyvenv NAME=experiment-a
+make new pyvenv NAME=experiment-a ARGS="--python 3.11 --deps-mode none"
 make change env-mode VALUE=interactive ARGS="--venv experiment-a"
 ```
 
@@ -368,6 +408,7 @@ make show lr list=5
 ```bash
 make change env-mode VALUE=non-interactive ARGS="--venv experiment-a"
 make show env-mode
+make doctor
 ```
 
 At that point:
@@ -405,6 +446,7 @@ It currently focuses on:
 
 - user-scoped config state
 - config history and global history inspection
+- operator-facing status and consistency checks
 - venv lifecycle management
 - active mode materialization for local vs. non-interactive execution
 - a generated Slurm submission skeleton

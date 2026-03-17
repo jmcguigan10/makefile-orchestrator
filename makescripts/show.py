@@ -14,18 +14,20 @@ from config_utils import (
     print_current_user,
     print_global_history_window,
     print_history_window,
+    print_status_summary,
+    print_user_overview,
     resolve_config_name,
 )
 from venv_utils import ansi_red, get_installed_packages, list_virtualenvs, plain_relative
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Show MLP configuration values.")
+    parser = argparse.ArgumentParser(description="Show orchestrator state, configs, and history.")
     parser.add_argument(
         "--config",
         "-cfg",
         default="all",
-        help="Config name to show, or 'all' to list every config. Special value: user.",
+        help="Config or state name to show. Special values: all, user, users, env-mode, venvs, status.",
     )
     parser.add_argument(
         "--back",
@@ -94,12 +96,28 @@ def main() -> int:
             print_current_user()
             return 0
 
+        if requested.lower() == "users":
+            if use_global_history:
+                raise ValueError("global=true does not apply to 'show users'.")
+            if args.back != 0 or args.list_count != 1:
+                raise ValueError("History windows do not apply to 'show users'.")
+            print_user_overview()
+            return 0
+
         if requested.lower() in {"env-mode", "env_mode", "envmode"}:
             if use_global_history:
                 raise ValueError("global=true does not apply to 'show env-mode'.")
             if args.back != 0 or args.list_count != 1:
                 raise ValueError("History windows do not apply to 'show env-mode'.")
             print_current_env_mode()
+            return 0
+
+        if requested.lower() == "status":
+            if use_global_history:
+                raise ValueError("global=true does not apply to 'show status'.")
+            if args.back != 0 or args.list_count != 1:
+                raise ValueError("History windows do not apply to 'show status'.")
+            print_status_summary()
             return 0
 
         store = load_store()
